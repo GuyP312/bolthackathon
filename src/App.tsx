@@ -13,6 +13,7 @@ import ProfilePage from './pages/ProfilePage';
 import LeaveManagementPage from './pages/LeaveManagementPage';
 import MentorTraineesPage from './pages/MentorTraineesPage';
 import AIEmployeeMatcherPage from './pages/AIEmployeeMatcherPage';
+import SemanticSearchPage from './pages/SemanticSearchPage';
 
 type Page = 
   | { type: 'login' }
@@ -25,7 +26,8 @@ type Page =
   | { type: 'profile' }
   | { type: 'leave-management' }
   | { type: 'mentor-trainees' }
-  | { type: 'ai-employee-matcher' };
+  | { type: 'ai-employee-matcher' }
+  | { type: 'semantic-search' };
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -61,6 +63,8 @@ function AppContent() {
       setCurrentPage({ type: 'create-standup' });
     } else if (previousPage === 'ai-employee-matcher') {
       setCurrentPage({ type: 'ai-employee-matcher' });
+    } else if (previousPage === 'semantic-search') {
+      setCurrentPage({ type: 'semantic-search' });
     } else if (previousPage.startsWith('team-members-')) {
       const teamId = parseInt(previousPage.split('-')[2]);
       setCurrentPage({ type: 'team-members', teamId });
@@ -92,6 +96,7 @@ function AppContent() {
   const navigateToLeaveManagement = () => navigateToPage({ type: 'leave-management' });
   const navigateToMentorTrainees = () => navigateToPage({ type: 'mentor-trainees' });
   const navigateToAIEmployeeMatcher = () => navigateToPage({ type: 'ai-employee-matcher' });
+  const navigateToSemanticSearch = () => navigateToPage({ type: 'semantic-search' });
 
   if (loading) {
     return (
@@ -193,6 +198,13 @@ function AppContent() {
           onProfileClick={navigateToProfile}
         />
       );
+    case 'semantic-search':
+      return (
+        <SemanticSearchPage
+          onBack={handleDynamicBack}
+          onProfileClick={navigateToProfile}
+        />
+      );
     default:
       return (
         <HomePage
@@ -202,6 +214,7 @@ function AppContent() {
           onMentorTraineesClick={navigateToMentorTrainees}
           onLeaveManagementClick={navigateToLeaveManagement}
           onAIEmployeeMatcherClick={navigateToAIEmployeeMatcher}
+          onSemanticSearchClick={navigateToSemanticSearch}
         />
       );
   }

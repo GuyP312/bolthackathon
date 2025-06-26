@@ -12,6 +12,7 @@ interface HomePageProps {
   onMentorTraineesClick?: () => void;
   onLeaveManagementClick?: () => void;
   onAIEmployeeMatcherClick?: () => void;
+  onSemanticSearchClick?: () => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({ 
@@ -20,7 +21,8 @@ const HomePage: React.FC<HomePageProps> = ({
   onProfileClick,
   onMentorTraineesClick,
   onLeaveManagementClick,
-  onAIEmployeeMatcherClick
+  onAIEmployeeMatcherClick,
+  onSemanticSearchClick
 }) => {
   const { teams, standups, members, leaves, getTodaysStandupByMember } = useApp();
   const { user } = useAuth();
@@ -149,58 +151,122 @@ const HomePage: React.FC<HomePageProps> = ({
             </div>
           </div>
 
-          {/* Mentor-specific section */}
-          {user?.role === 'mentor' && (
-            <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* My Trainees Card */}
-              <div 
-                className="bg-gradient-to-r from-purple-500 to-indigo-600 rounded-lg shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-                onClick={onMentorTraineesClick}
-              >
-                <div className="flex items-center justify-between text-white">
-                  <div className="flex items-center">
-                    <div className="bg-white bg-opacity-20 p-3 rounded-lg mr-4">
-                      <UserCheck className="h-8 w-8" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold mb-1">My Trainees</h3>
-                      <p className="text-purple-100">
-                        Manage and monitor your {myTrainees.length} assigned trainee{myTrainees.length !== 1 ? 's' : ''}
-                      </p>
-                    </div>
+          {/* Feature Cards Section */}
+          <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Semantic Search Card */}
+            <div 
+              className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+              onClick={onSemanticSearchClick}
+            >
+              <div className="flex items-center justify-between text-white">
+                <div className="flex items-center">
+                  <div className="bg-white bg-opacity-20 p-3 rounded-lg mr-4">
+                    <Search className="h-8 w-8" />
                   </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold">{myTrainees.length}</div>
-                    <div className="text-sm text-purple-200">Trainees</div>
+                  <div>
+                    <h3 className="text-xl font-bold mb-1">Semantic Search</h3>
+                    <p className="text-indigo-100">
+                      Find employees using AI-powered natural language search
+                    </p>
                   </div>
                 </div>
-              </div>
-
-              {/* AI Employee Matcher Card */}
-              <div 
-                className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-                onClick={onAIEmployeeMatcherClick}
-              >
-                <div className="flex items-center justify-between text-white">
-                  <div className="flex items-center">
-                    <div className="bg-white bg-opacity-20 p-3 rounded-lg mr-4">
-                      <Brain className="h-8 w-8" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold mb-1">AI Employee Matcher</h3>
-                      <p className="text-emerald-100">
-                        Find the best team members for your tasks using AI
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold">AI</div>
-                    <div className="text-sm text-emerald-200">Powered</div>
-                  </div>
+                <div className="text-right">
+                  <div className="text-3xl font-bold">AI</div>
+                  <div className="text-sm text-indigo-200">Search</div>
                 </div>
               </div>
             </div>
-          )}
+
+            {/* Mentor-specific section */}
+            {user?.role === 'mentor' && (
+              <>
+                {/* My Trainees Card */}
+                <div 
+                  className="bg-gradient-to-r from-purple-500 to-indigo-600 rounded-lg shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                  onClick={onMentorTraineesClick}
+                >
+                  <div className="flex items-center justify-between text-white">
+                    <div className="flex items-center">
+                      <div className="bg-white bg-opacity-20 p-3 rounded-lg mr-4">
+                        <UserCheck className="h-8 w-8" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold mb-1">My Trainees</h3>
+                        <p className="text-purple-100">
+                          Manage and monitor your {myTrainees.length} assigned trainee{myTrainees.length !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold">{myTrainees.length}</div>
+                      <div className="text-sm text-purple-200">Trainees</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Employee Matcher Card */}
+                <div 
+                  className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                  onClick={onAIEmployeeMatcherClick}
+                >
+                  <div className="flex items-center justify-between text-white">
+                    <div className="flex items-center">
+                      <div className="bg-white bg-opacity-20 p-3 rounded-lg mr-4">
+                        <Brain className="h-8 w-8" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold mb-1">AI Employee Matcher</h3>
+                        <p className="text-emerald-100">
+                          Find the best team members for your tasks using AI
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold">AI</div>
+                      <div className="text-sm text-emerald-200">Powered</div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* For non-mentors, show additional feature cards */}
+            {user?.role !== 'mentor' && (
+              <>
+                <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg shadow-lg p-6">
+                  <div className="flex items-center justify-between text-white">
+                    <div className="flex items-center">
+                      <div className="bg-white bg-opacity-20 p-3 rounded-lg mr-4">
+                        <TrendingUp className="h-8 w-8" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold mb-1">Analytics</h3>
+                        <p className="text-green-100">
+                          Track your progress and team performance
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-lg shadow-lg p-6">
+                  <div className="flex items-center justify-between text-white">
+                    <div className="flex items-center">
+                      <div className="bg-white bg-opacity-20 p-3 rounded-lg mr-4">
+                        <Calendar className="h-8 w-8" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold mb-1">Schedule</h3>
+                        <p className="text-orange-100">
+                          Manage your calendar and upcoming events
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Search */}
           <div className="max-w-md mx-auto mb-8">

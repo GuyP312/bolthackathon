@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
   Mail, 
@@ -44,9 +43,12 @@ interface Standup {
   created_at: string;
 }
 
-const MemberDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+interface MemberDetailPageProps {
+  memberId: string;
+  onBack: () => void;
+}
+
+const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ memberId, onBack }) => {
   const { user } = useAuth();
   
   const [member, setMember] = useState<Member | null>(null);
@@ -63,27 +65,27 @@ const MemberDetailPage: React.FC = () => {
   const [editSkills, setEditSkills] = useState<string[]>([]);
   const [newSkill, setNewSkill] = useState('');
 
-  const canEdit = user?.id === id;
+  const canEdit = user?.id === memberId;
 
   useEffect(() => {
-    if (id) {
+    if (memberId) {
       fetchMember();
       fetchRecentStandups();
     }
-  }, [id]);
+  }, [memberId]);
 
   useEffect(() => {
-    if (viewMode === 'calendar' && id) {
+    if (viewMode === 'calendar' && memberId) {
       fetchCalendarStandups();
     }
-  }, [viewMode, currentDate, id]);
+  }, [viewMode, currentDate, memberId]);
 
   const fetchMember = async () => {
     try {
       const { data, error } = await supabase
         .from('members')
         .select('*')
-        .eq('id', id)
+        .eq('id', memberId)
         .single();
 
       if (error) throw error;
@@ -100,7 +102,7 @@ const MemberDetailPage: React.FC = () => {
       const { data, error } = await supabase
         .from('standups')
         .select('*')
-        .eq('member_id', id)
+        .eq('member_id', memberId)
         .order('date', { ascending: false })
         .limit(10);
 
@@ -119,7 +121,7 @@ const MemberDetailPage: React.FC = () => {
       const { data, error } = await supabase
         .from('standups')
         .select('*')
-        .eq('member_id', id)
+        .eq('member_id', memberId)
         .gte('date', startOfMonth.toISOString().split('T')[0])
         .lte('date', endOfMonth.toISOString().split('T')[0])
         .order('date', { ascending: false });
@@ -313,7 +315,7 @@ const MemberDetailPage: React.FC = () => {
         {/* Header */}
         <div className="mb-8">
           <button
-            onClick={() => navigate(-1)}
+            onClick={onBack}
             className="inline-flex items-center text-gray-600 hover:text-gray-800 mb-4 transition-colors duration-200"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />

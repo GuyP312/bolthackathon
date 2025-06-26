@@ -34,21 +34,31 @@ interface Member {
 }
 
 interface Standup {
-  id: string;
-  member_id: string;
+  id: number;
+  member_id: number;
+  team_id: number;
   date: string;
-  yesterday: string;
-  today: string;
-  blockers: string;
+  content: string[];
+  content_stat: boolean[];
   created_at: string;
+  member?: Member;
+  team?: any;
+  // Add computed properties for compatibility with StandupCard
+  tasks: any[];
+  blockers: string;
+  memberId: string;
+  memberName: string;
+  memberAvatar: string;
+  timestamp: string;
 }
 
 interface MemberDetailPageProps {
   memberId: string;
   onBack: () => void;
+  onProfileClick?: () => void;
 }
 
-const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ memberId, onBack }) => {
+const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ memberId, onBack, onProfileClick }) => {
   const { user } = useAuth();
   
   const [member, setMember] = useState<Member | null>(null);
@@ -57,6 +67,7 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ memberId, onBack })
   const [viewMode, setViewMode] = useState<'recent' | 'calendar'>('recent');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarStandups, setCalendarStandups] = useState<Standup[]>([]);
+  const [leaves, setLeaves] = useState<any[]>([]);
   
   // Edit states
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -65,12 +76,13 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ memberId, onBack })
   const [editSkills, setEditSkills] = useState<string[]>([]);
   const [newSkill, setNewSkill] = useState('');
 
-  const canEdit = user?.id === memberId;
+  const canEdit = user?.id === parseInt(memberId);
 
   useEffect(() => {
     if (memberId) {
       fetchMember();
       fetchRecentStandups();
+      fetchLeaves();
     }
   }, [memberId]);
 
@@ -101,13 +113,20 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ memberId, onBack })
     try {
       const { data, error } = await supabase
         .from('standups')
-        .select('*')
+        .select(`
+          *,
+          member:members(*),
+          team:teams(*)
+        `)
         .eq('member_id', memberId)
         .order('date', { ascending: false })
         .limit(10);
 
       if (error) throw error;
-      setRecentStandups(data || []);
+      
+      // Transform the data to match StandupCard expectations
+      const transformedStandups = (data || []).map(transformStandupData);
+      setRecentStandups(transformedStandups);
     } catch (error) {
       console.error('Error fetching standups:', error);
     }
@@ -120,17 +139,73 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ memberId, onBack })
       
       const { data, error } = await supabase
         .from('standups')
-        .select('*')
+        .select(`
+          *,
+          member:members(*),
+          team:teams(*)
+        `)
         .eq('member_id', memberId)
         .gte('date', startOfMonth.toISOString().split('T')[0])
         .lte('date', endOfMonth.toISOString().split('T')[0])
         .order('date', { ascending: false });
 
       if (error) throw error;
-      setCalendarStandups(data || []);
+      
+      // Transform the data to match StandupCard expectations
+      const transformedStandups = (data || []).map(transformStandupData);
+      setCalendarStandups(transformedStandups);
     } catch (error) {
       console.error('Error fetching calendar standups:', error);
     }
+  };
+
+  const fetchLeaves = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('leaves')
+        .select('*')
+        .eq('member_id', memberId)
+        .eq('approved', true);
+
+      if (error) throw error;
+      setLeaves(data || []);
+    } catch (error) {
+      console.error('Error fetching leaves:', error);
+    }
+  };
+
+  // Helper function to transform standup data for compatibility with StandupCard
+  const transformStandupData = (standup: any): Standup => {
+    // Parse content array to extract tasks and blockers
+    const content = standup.content || [];
+    const contentStat = standup.content_stat || [];
+    const tasks: any[] = [];
+    let blockers = '';
+
+    // Parse content array - each item could be a task or blocker
+    content.forEach((item: string, index: number) => {
+      if (item.toLowerCase().includes('blocker') || item.toLowerCase().includes('challenge')) {
+        // Extract blocker text (remove "Blockers:" prefix if present)
+        blockers = item.replace(/^blockers?:\s*/i, '').trim();
+      } else {
+        // Treat as a task
+        tasks.push({
+          id: `task-${standup.id}-${index}`,
+          text: item.trim(),
+          completed: contentStat[index] || false
+        });
+      }
+    });
+
+    return {
+      ...standup,
+      tasks,
+      blockers,
+      memberId: standup.member_id?.toString() || '',
+      memberName: standup.member?.name || member?.name || 'Unknown Member',
+      memberAvatar: `https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face`,
+      timestamp: standup.created_at || new Date().toISOString()
+    };
   };
 
   const handleSaveDescription = async () => {
@@ -231,6 +306,59 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ memberId, onBack })
     return calendarStandups.find(standup => standup.date === dateString);
   };
 
+  const getLeaveForDate = (date: number) => {
+    const dateString = new Date(currentDate.getFullYear(), currentDate.getMonth(), date)
+      .toISOString().split('T')[0];
+    return leaves.find(leave => leave.date === dateString);
+  };
+
+  const isWeekday = (date: number) => {
+    const dayOfWeek = new Date(currentDate.getFullYear(), currentDate.getMonth(), date).getDay();
+    return dayOfWeek >= 1 && dayOfWeek <= 5; // Monday to Friday
+  };
+
+  const isToday = (date: number) => {
+    const today = new Date();
+    return today.getDate() === date && 
+           today.getMonth() === currentDate.getMonth() && 
+           today.getFullYear() === currentDate.getFullYear();
+  };
+
+  const isPastWeekday = (date: number) => {
+    const dayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), date);
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+    return isWeekday(date) && dayDate < todayDate && !getStandupForDate(date) && !getLeaveForDate(date);
+  };
+
+  const getDayClasses = (date: number) => {
+    const standup = getStandupForDate(date);
+    const leave = getLeaveForDate(date);
+    
+    if (isToday(date)) {
+      return 'bg-blue-500 text-white border-2 border-blue-600';
+    }
+    
+    if (leave) {
+      return 'bg-yellow-300 text-yellow-900';
+    }
+    
+    if (standup) {
+      return 'bg-green-300 text-green-900';
+    }
+    
+    if (isPastWeekday(date)) {
+      return 'bg-red-300 text-red-900';
+    }
+    
+    if (isWeekday(date)) {
+      return 'bg-white text-gray-700';
+    }
+    
+    // Weekend
+    return 'bg-gray-200 text-gray-600';
+  };
+
   const renderCalendarView = () => {
     const daysInMonth = getDaysInMonth(currentDate);
     const firstDay = getFirstDayOfMonth(currentDate);
@@ -238,27 +366,17 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ memberId, onBack })
 
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="h-24"></div>);
+      days.push(<div key={`empty-${i}`} className="aspect-square"></div>);
     }
 
     // Add cells for each day of the month
     for (let day = 1; day <= daysInMonth; day++) {
-      const standup = getStandupForDate(day);
-      const isToday = new Date().toDateString() === new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toDateString();
-      
       days.push(
         <div
           key={day}
-          className={`h-24 border border-gray-200 p-2 ${isToday ? 'bg-blue-50 border-blue-300' : 'bg-white'}`}
+          className={`aspect-square border-2 border-black flex items-center justify-center text-lg font-bold ${getDayClasses(day)}`}
         >
-          <div className={`text-sm font-medium mb-1 ${isToday ? 'text-blue-700' : 'text-gray-700'}`}>
-            {day}
-          </div>
-          {standup && (
-            <div className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-              Standup
-            </div>
-          )}
+          {day}
         </div>
       );
     }
@@ -285,10 +403,32 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ memberId, onBack })
           </div>
         </div>
 
+        {/* Legend */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-green-300 border-2 border-black"></div>
+              <span className="text-gray-700 font-medium">Standup completed</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-yellow-300 border-2 border-black"></div>
+              <span className="text-gray-700 font-medium">Leave day</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-red-300 border-2 border-black"></div>
+              <span className="text-gray-700 font-medium">Missing standup</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-gray-200 border-2 border-black"></div>
+              <span className="text-gray-700 font-medium">Weekend/Future</span>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
           <div className="grid grid-cols-7 bg-gray-50">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="p-3 text-center text-sm font-medium text-gray-700 border-r border-gray-200 last:border-r-0">
+              <div key={day} className="p-3 text-center text-sm font-bold text-gray-700 border-2 border-black">
                 {day}
               </div>
             ))}

@@ -17,6 +17,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import StandupCard from '../components/Standup/StandupCard';
+import DatePicker from '../components/Calendar/DatePicker';
 
 interface Member {
   id: string;
@@ -280,165 +281,14 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ memberId, onBack, o
     });
   };
 
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  // Get standup dates for this member (for calendar coloring)
+  const getMemberStandupDates = () => {
+    return calendarStandups.map(standup => standup.date);
   };
 
-  const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-  };
-
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentDate(prev => {
-      const newDate = new Date(prev);
-      if (direction === 'prev') {
-        newDate.setMonth(prev.getMonth() - 1);
-      } else {
-        newDate.setMonth(prev.getMonth() + 1);
-      }
-      return newDate;
-    });
-  };
-
-  const getStandupForDate = (date: number) => {
-    const dateString = new Date(currentDate.getFullYear(), currentDate.getMonth(), date)
-      .toISOString().split('T')[0];
-    return calendarStandups.find(standup => standup.date === dateString);
-  };
-
-  const getLeaveForDate = (date: number) => {
-    const dateString = new Date(currentDate.getFullYear(), currentDate.getMonth(), date)
-      .toISOString().split('T')[0];
-    return leaves.find(leave => leave.date === dateString);
-  };
-
-  const isWeekday = (date: number) => {
-    const dayOfWeek = new Date(currentDate.getFullYear(), currentDate.getMonth(), date).getDay();
-    return dayOfWeek >= 1 && dayOfWeek <= 5; // Monday to Friday
-  };
-
-  const isToday = (date: number) => {
-    const today = new Date();
-    return today.getDate() === date && 
-           today.getMonth() === currentDate.getMonth() && 
-           today.getFullYear() === currentDate.getFullYear();
-  };
-
-  const isPastWeekday = (date: number) => {
-    const dayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), date);
-    const todayDate = new Date();
-    todayDate.setHours(0, 0, 0, 0);
-    return isWeekday(date) && dayDate < todayDate && !getStandupForDate(date) && !getLeaveForDate(date);
-  };
-
-  const getDayClasses = (date: number) => {
-    const standup = getStandupForDate(date);
-    const leave = getLeaveForDate(date);
-    
-    if (isToday(date)) {
-      return 'bg-blue-500 text-white border-2 border-blue-600';
-    }
-    
-    if (leave) {
-      return 'bg-yellow-300 text-yellow-900';
-    }
-    
-    if (standup) {
-      return 'bg-green-300 text-green-900';
-    }
-    
-    if (isPastWeekday(date)) {
-      return 'bg-red-300 text-red-900';
-    }
-    
-    if (isWeekday(date)) {
-      return 'bg-white text-gray-700';
-    }
-    
-    // Weekend
-    return 'bg-gray-200 text-gray-600';
-  };
-
-  const renderCalendarView = () => {
-    const daysInMonth = getDaysInMonth(currentDate);
-    const firstDay = getFirstDayOfMonth(currentDate);
-    const days = [];
-
-    // Add empty cells for days before the first day of the month
-    for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="aspect-square"></div>);
-    }
-
-    // Add cells for each day of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push(
-        <div
-          key={day}
-          className={`aspect-square border-2 border-black flex items-center justify-center text-lg font-bold ${getDayClasses(day)}`}
-        >
-          {day}
-        </div>
-      );
-    }
-
-    return (
-      <div>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-semibold text-gray-900">
-            {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-          </h3>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => navigateMonth('prev')}
-              className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors duration-200"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => navigateMonth('next')}
-              className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors duration-200"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Legend */}
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-green-300 border-2 border-black"></div>
-              <span className="text-gray-700 font-medium">Standup completed</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-yellow-300 border-2 border-black"></div>
-              <span className="text-gray-700 font-medium">Leave day</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-red-300 border-2 border-black"></div>
-              <span className="text-gray-700 font-medium">Missing standup</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-gray-200 border-2 border-black"></div>
-              <span className="text-gray-700 font-medium">Weekend/Future</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-          <div className="grid grid-cols-7 bg-gray-50">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="p-3 text-center text-sm font-bold text-gray-700 border-2 border-black">
-                {day}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7">
-            {days}
-          </div>
-        </div>
-      </div>
-    );
+  // Get leave dates for this member (for calendar coloring)
+  const getMemberLeaveDates = () => {
+    return leaves.map(leave => leave.date);
   };
 
   if (!member) {
@@ -734,7 +584,17 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ memberId, onBack, o
             )}
           </div>
         ) : (
-          renderCalendarView()
+          <div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-6">
+              Calendar View
+            </h3>
+            <DatePicker
+              selectedDate={currentDate}
+              onDateChange={setCurrentDate}
+              standupDates={getMemberStandupDates()}
+              leaveDates={getMemberLeaveDates()}
+            />
+          </div>
         )}
       </main>
     </div>

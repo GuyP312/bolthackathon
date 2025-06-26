@@ -18,6 +18,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import StandupCard from '../components/Standup/StandupCard';
+import { Standup, Task } from '../types';
 
 interface Member {
   id: string;
@@ -32,16 +33,6 @@ interface Member {
   description?: string;
   skills?: string[];
   avatar_url?: string;
-}
-
-interface Standup {
-  id: string;
-  member_id: string;
-  date: string;
-  yesterday: string;
-  today: string;
-  blockers: string;
-  created_at: string;
 }
 
 interface MemberDetailPageProps {
@@ -63,6 +54,7 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
   const [viewMode, setViewMode] = useState<'recent' | 'calendar'>('recent');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarStandups, setCalendarStandups] = useState<Standup[]>([]);
+  const [memberLeaves, setMemberLeaves] = useState<any[]>([]);
   
   // Edit states
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -71,7 +63,7 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
   const [editSkills, setEditSkills] = useState<string[]>([]);
   const [newSkill, setNewSkill] = useState('');
 
-  const canEdit = user?.id === memberId;
+  const canEdit = user?.id === parseInt(memberId);
 
   useEffect(() => {
     if (memberId) {
@@ -83,8 +75,43 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
   useEffect(() => {
     if (viewMode === 'calendar' && memberId) {
       fetchCalendarStandups();
+      fetchMemberLeaves();
     }
   }, [viewMode, currentDate, memberId]);
+
+  // Helper function to transform standup data for compatibility with StandupCard
+  const transformStandupData = (standup: any): Standup => {
+    // Parse content array to extract tasks and blockers
+    const content = standup.content || [];
+    const contentStat = standup.content_stat || [];
+    const tasks: Task[] = [];
+    let blockers = '';
+
+    // Parse content array - each item could be a task or blocker
+    content.forEach((item: string, index: number) => {
+      if (item.toLowerCase().includes('blocker') || item.toLowerCase().includes('challenge')) {
+        // Extract blocker text (remove "Blockers:" prefix if present)
+        blockers = item.replace(/^blockers?:\s*/i, '').trim();
+      } else {
+        // Treat as a task
+        tasks.push({
+          id: `task-${standup.id}-${index}`,
+          text: item.trim(),
+          completed: contentStat[index] || false
+        });
+      }
+    });
+
+    return {
+      ...standup,
+      tasks,
+      blockers,
+      memberId: standup.member_id?.toString() || '',
+      memberName: member?.name || 'Unknown Member',
+      memberAvatar: `https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face`,
+      timestamp: standup.created_at || new Date().toISOString()
+    };
+  };
 
   const fetchMember = async () => {
     try {
@@ -107,13 +134,20 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
     try {
       const { data, error } = await supabase
         .from('standups')
-        .select('*')
+        .select(`
+          *,
+          member:members(*),
+          team:teams(*)
+        `)
         .eq('member_id', memberId)
-        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(10);
 
       if (error) throw error;
-      setRecentStandups(data || []);
+      
+      // Transform the data to match StandupCard expectations
+      const transformedStandups = (data || []).map(transformStandupData);
+      setRecentStandups(transformedStandups);
     } catch (error) {
       console.error('Error fetching standups:', error);
     }
@@ -126,16 +160,43 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
       
       const { data, error } = await supabase
         .from('standups')
-        .select('*')
+        .select(`
+          *,
+          member:members(*),
+          team:teams(*)
+        `)
         .eq('member_id', memberId)
         .gte('date', startOfMonth.toISOString().split('T')[0])
         .lte('date', endOfMonth.toISOString().split('T')[0])
-        .order('date', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setCalendarStandups(data || []);
+      
+      // Transform the data to match StandupCard expectations
+      const transformedStandups = (data || []).map(transformStandupData);
+      setCalendarStandups(transformedStandups);
     } catch (error) {
       console.error('Error fetching calendar standups:', error);
+    }
+  };
+
+  const fetchMemberLeaves = async () => {
+    try {
+      const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+      
+      const { data, error } = await supabase
+        .from('leaves')
+        .select('*')
+        .eq('member_id', memberId)
+        .eq('approved', true)
+        .gte('date', startOfMonth.toISOString().split('T')[0])
+        .lte('date', endOfMonth.toISOString().split('T')[0]);
+
+      if (error) throw error;
+      setMemberLeaves(data || []);
+    } catch (error) {
+      console.error('Error fetching member leaves:', error);
     }
   };
 
@@ -237,6 +298,54 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
     return calendarStandups.find(standup => standup.date === dateString);
   };
 
+  const getLeaveForDate = (date: number) => {
+    const dateString = new Date(currentDate.getFullYear(), currentDate.getMonth(), date)
+      .toISOString().split('T')[0];
+    return memberLeaves.find(leave => leave.date === dateString);
+  };
+
+  const isWeekday = (date: number) => {
+    const dayOfWeek = new Date(currentDate.getFullYear(), currentDate.getMonth(), date).getDay();
+    return dayOfWeek >= 1 && dayOfWeek <= 5; // Monday to Friday
+  };
+
+  const isToday = (date: number) => {
+    const today = new Date();
+    const cellDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), date);
+    return today.toDateString() === cellDate.toDateString();
+  };
+
+  const isPastWeekday = (date: number) => {
+    const today = new Date();
+    const cellDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), date);
+    today.setHours(0, 0, 0, 0);
+    cellDate.setHours(0, 0, 0, 0);
+    return isWeekday(date) && cellDate < today;
+  };
+
+  const getDayClasses = (date: number) => {
+    const baseClasses = 'h-20 border-2 border-black flex items-center justify-center text-lg font-semibold transition-all duration-200';
+    
+    if (isToday(date)) {
+      return `${baseClasses} bg-blue-400 text-blue-900 border-blue-600`;
+    }
+    
+    if (getLeaveForDate(date)) {
+      return `${baseClasses} bg-yellow-300 text-yellow-900`;
+    }
+    
+    if (getStandupForDate(date)) {
+      return `${baseClasses} bg-green-300 text-green-900`;
+    }
+    
+    if (isPastWeekday(date)) {
+      return `${baseClasses} bg-red-300 text-red-900`;
+    }
+    
+    // Weekend or future days
+    return `${baseClasses} bg-gray-300 text-gray-700`;
+  };
+
   const renderCalendarView = () => {
     const daysInMonth = getDaysInMonth(currentDate);
     const firstDay = getFirstDayOfMonth(currentDate);
@@ -244,27 +353,14 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
 
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="h-24"></div>);
+      days.push(<div key={`empty-${i}`} className="h-20"></div>);
     }
 
     // Add cells for each day of the month
     for (let day = 1; day <= daysInMonth; day++) {
-      const standup = getStandupForDate(day);
-      const isToday = new Date().toDateString() === new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toDateString();
-      
       days.push(
-        <div
-          key={day}
-          className={`h-24 border border-gray-200 p-2 ${isToday ? 'bg-blue-50 border-blue-300' : 'bg-white'}`}
-        >
-          <div className={`text-sm font-medium mb-1 ${isToday ? 'text-blue-700' : 'text-gray-700'}`}>
-            {day}
-          </div>
-          {standup && (
-            <div className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-              Standup
-            </div>
-          )}
+        <div key={day} className={getDayClasses(day)}>
+          {day}
         </div>
       );
     }
@@ -291,14 +387,39 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-          <div className="grid grid-cols-7 bg-gray-50">
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          {/* Legend */}
+          <div className="p-6 bg-gray-50 border-b border-gray-200">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-6 h-6 bg-green-300 border-2 border-black rounded"></div>
+                <span className="text-sm font-medium text-gray-700">Standup completed</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-6 h-6 bg-yellow-300 border-2 border-black rounded"></div>
+                <span className="text-sm font-medium text-gray-700">Leave day</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-6 h-6 bg-red-300 border-2 border-black rounded"></div>
+                <span className="text-sm font-medium text-gray-700">Missing standup</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-6 h-6 bg-gray-300 border-2 border-black rounded"></div>
+                <span className="text-sm font-medium text-gray-700">Weekend/Future</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Day Headers */}
+          <div className="grid grid-cols-7 bg-white">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="p-3 text-center text-sm font-medium text-gray-700 border-r border-gray-200 last:border-r-0">
+              <div key={day} className="p-4 text-center text-sm font-bold text-gray-700 border-r-2 border-black last:border-r-0 bg-gray-100">
                 {day}
               </div>
             ))}
           </div>
+
+          {/* Calendar Grid */}
           <div className="grid grid-cols-7">
             {days}
           </div>

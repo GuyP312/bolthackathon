@@ -218,12 +218,12 @@ const TeamPage: React.FC<TeamPageProps> = ({
               <p className="text-gray-500 mb-4">
                 No team members have submitted their daily standup for {formatDate(selectedDate)}.
               </p>
-              <button
+              {/* <button
                 onClick={onCreateStandup}
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
               >
                 Create First Standup
-              </button>
+              </button> */}
             </div>
           )}
         </div>

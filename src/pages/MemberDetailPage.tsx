@@ -12,13 +12,11 @@ import {
   Trash2,
   AlertCircle,
   ChevronLeft,
-  ChevronRight,
-  User
+  ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import StandupCard from '../components/Standup/StandupCard';
-import { Standup, Task } from '../types';
 
 interface Member {
   id: string;
@@ -35,17 +33,32 @@ interface Member {
   avatar_url?: string;
 }
 
+interface Standup {
+  id: number;
+  member_id: number;
+  team_id: number;
+  date: string;
+  content: string[];
+  content_stat: boolean[];
+  created_at: string;
+  member?: Member;
+  team?: any;
+  // Add computed properties for compatibility with StandupCard
+  tasks: any[];
+  blockers: string;
+  memberId: string;
+  memberName: string;
+  memberAvatar: string;
+  timestamp: string;
+}
+
 interface MemberDetailPageProps {
   memberId: string;
   onBack: () => void;
-  onProfileClick: () => void;
+  onProfileClick?: () => void;
 }
 
-const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ 
-  memberId, 
-  onBack, 
-  onProfileClick 
-}) => {
+const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ memberId, onBack, onProfileClick }) => {
   const { user } = useAuth();
   
   const [member, setMember] = useState<Member | null>(null);
@@ -54,7 +67,7 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
   const [viewMode, setViewMode] = useState<'recent' | 'calendar'>('recent');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarStandups, setCalendarStandups] = useState<Standup[]>([]);
-  const [memberLeaves, setMemberLeaves] = useState<any[]>([]);
+  const [leaves, setLeaves] = useState<any[]>([]);
   
   // Edit states
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -69,49 +82,15 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
     if (memberId) {
       fetchMember();
       fetchRecentStandups();
+      fetchLeaves();
     }
   }, [memberId]);
 
   useEffect(() => {
     if (viewMode === 'calendar' && memberId) {
       fetchCalendarStandups();
-      fetchMemberLeaves();
     }
   }, [viewMode, currentDate, memberId]);
-
-  // Helper function to transform standup data for compatibility with StandupCard
-  const transformStandupData = (standup: any): Standup => {
-    // Parse content array to extract tasks and blockers
-    const content = standup.content || [];
-    const contentStat = standup.content_stat || [];
-    const tasks: Task[] = [];
-    let blockers = '';
-
-    // Parse content array - each item could be a task or blocker
-    content.forEach((item: string, index: number) => {
-      if (item.toLowerCase().includes('blocker') || item.toLowerCase().includes('challenge')) {
-        // Extract blocker text (remove "Blockers:" prefix if present)
-        blockers = item.replace(/^blockers?:\s*/i, '').trim();
-      } else {
-        // Treat as a task
-        tasks.push({
-          id: `task-${standup.id}-${index}`,
-          text: item.trim(),
-          completed: contentStat[index] || false
-        });
-      }
-    });
-
-    return {
-      ...standup,
-      tasks,
-      blockers,
-      memberId: standup.member_id?.toString() || '',
-      memberName: member?.name || 'Unknown Member',
-      memberAvatar: `https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face`,
-      timestamp: standup.created_at || new Date().toISOString()
-    };
-  };
 
   const fetchMember = async () => {
     try {
@@ -140,7 +119,7 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
           team:teams(*)
         `)
         .eq('member_id', memberId)
-        .order('created_at', { ascending: false })
+        .order('date', { ascending: false })
         .limit(10);
 
       if (error) throw error;
@@ -168,7 +147,7 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
         .eq('member_id', memberId)
         .gte('date', startOfMonth.toISOString().split('T')[0])
         .lte('date', endOfMonth.toISOString().split('T')[0])
-        .order('created_at', { ascending: false });
+        .order('date', { ascending: false });
 
       if (error) throw error;
       
@@ -180,24 +159,53 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
     }
   };
 
-  const fetchMemberLeaves = async () => {
+  const fetchLeaves = async () => {
     try {
-      const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-      const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-      
       const { data, error } = await supabase
         .from('leaves')
         .select('*')
         .eq('member_id', memberId)
-        .eq('approved', true)
-        .gte('date', startOfMonth.toISOString().split('T')[0])
-        .lte('date', endOfMonth.toISOString().split('T')[0]);
+        .eq('approved', true);
 
       if (error) throw error;
-      setMemberLeaves(data || []);
+      setLeaves(data || []);
     } catch (error) {
-      console.error('Error fetching member leaves:', error);
+      console.error('Error fetching leaves:', error);
     }
+  };
+
+  // Helper function to transform standup data for compatibility with StandupCard
+  const transformStandupData = (standup: any): Standup => {
+    // Parse content array to extract tasks and blockers
+    const content = standup.content || [];
+    const contentStat = standup.content_stat || [];
+    const tasks: any[] = [];
+    let blockers = '';
+
+    // Parse content array - each item could be a task or blocker
+    content.forEach((item: string, index: number) => {
+      if (item.toLowerCase().includes('blocker') || item.toLowerCase().includes('challenge')) {
+        // Extract blocker text (remove "Blockers:" prefix if present)
+        blockers = item.replace(/^blockers?:\s*/i, '').trim();
+      } else {
+        // Treat as a task
+        tasks.push({
+          id: `task-${standup.id}-${index}`,
+          text: item.trim(),
+          completed: contentStat[index] || false
+        });
+      }
+    });
+
+    return {
+      ...standup,
+      tasks,
+      blockers,
+      memberId: standup.member_id?.toString() || '',
+      memberName: standup.member?.name || member?.name || 'Unknown Member',
+      memberAvatar: `https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face`,
+      timestamp: standup.created_at || new Date().toISOString()
+    };
   };
 
   const handleSaveDescription = async () => {
@@ -301,7 +309,7 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
   const getLeaveForDate = (date: number) => {
     const dateString = new Date(currentDate.getFullYear(), currentDate.getMonth(), date)
       .toISOString().split('T')[0];
-    return memberLeaves.find(leave => leave.date === dateString);
+    return leaves.find(leave => leave.date === dateString);
   };
 
   const isWeekday = (date: number) => {
@@ -311,39 +319,44 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
 
   const isToday = (date: number) => {
     const today = new Date();
-    const cellDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), date);
-    return today.toDateString() === cellDate.toDateString();
+    return today.getDate() === date && 
+           today.getMonth() === currentDate.getMonth() && 
+           today.getFullYear() === currentDate.getFullYear();
   };
 
   const isPastWeekday = (date: number) => {
-    const today = new Date();
-    const cellDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), date);
-    today.setHours(0, 0, 0, 0);
-    cellDate.setHours(0, 0, 0, 0);
-    return isWeekday(date) && cellDate < today;
+    const dayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), date);
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+    return isWeekday(date) && dayDate < todayDate && !getStandupForDate(date) && !getLeaveForDate(date);
   };
 
   const getDayClasses = (date: number) => {
-    const baseClasses = 'h-20 border-2 border-black flex items-center justify-center text-lg font-semibold transition-all duration-200';
+    const standup = getStandupForDate(date);
+    const leave = getLeaveForDate(date);
     
     if (isToday(date)) {
-      return `${baseClasses} bg-blue-400 text-blue-900 border-blue-600`;
+      return 'bg-blue-500 text-white border-2 border-blue-600';
     }
     
-    if (getLeaveForDate(date)) {
-      return `${baseClasses} bg-yellow-300 text-yellow-900`;
+    if (leave) {
+      return 'bg-yellow-300 text-yellow-900';
     }
     
-    if (getStandupForDate(date)) {
-      return `${baseClasses} bg-green-300 text-green-900`;
+    if (standup) {
+      return 'bg-green-300 text-green-900';
     }
     
     if (isPastWeekday(date)) {
-      return `${baseClasses} bg-red-300 text-red-900`;
+      return 'bg-red-300 text-red-900';
     }
     
-    // Weekend or future days
-    return `${baseClasses} bg-gray-300 text-gray-700`;
+    if (isWeekday(date)) {
+      return 'bg-white text-gray-700';
+    }
+    
+    // Weekend
+    return 'bg-gray-200 text-gray-600';
   };
 
   const renderCalendarView = () => {
@@ -353,13 +366,16 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
 
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="h-20"></div>);
+      days.push(<div key={`empty-${i}`} className="aspect-square"></div>);
     }
 
     // Add cells for each day of the month
     for (let day = 1; day <= daysInMonth; day++) {
       days.push(
-        <div key={day} className={getDayClasses(day)}>
+        <div
+          key={day}
+          className={`aspect-square border-2 border-black flex items-center justify-center text-lg font-bold ${getDayClasses(day)}`}
+        >
           {day}
         </div>
       );
@@ -387,39 +403,36 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-          {/* Legend */}
-          <div className="p-6 bg-gray-50 border-b border-gray-200">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-6 h-6 bg-green-300 border-2 border-black rounded"></div>
-                <span className="text-sm font-medium text-gray-700">Standup completed</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-6 h-6 bg-yellow-300 border-2 border-black rounded"></div>
-                <span className="text-sm font-medium text-gray-700">Leave day</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-6 h-6 bg-red-300 border-2 border-black rounded"></div>
-                <span className="text-sm font-medium text-gray-700">Missing standup</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-6 h-6 bg-gray-300 border-2 border-black rounded"></div>
-                <span className="text-sm font-medium text-gray-700">Weekend/Future</span>
-              </div>
+        {/* Legend */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-green-300 border-2 border-black"></div>
+              <span className="text-gray-700 font-medium">Standup completed</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-yellow-300 border-2 border-black"></div>
+              <span className="text-gray-700 font-medium">Leave day</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-red-300 border-2 border-black"></div>
+              <span className="text-gray-700 font-medium">Missing standup</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-gray-200 border-2 border-black"></div>
+              <span className="text-gray-700 font-medium">Weekend/Future</span>
             </div>
           </div>
+        </div>
 
-          {/* Day Headers */}
-          <div className="grid grid-cols-7 bg-white">
+        <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+          <div className="grid grid-cols-7 bg-gray-50">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="p-4 text-center text-sm font-bold text-gray-700 border-r-2 border-black last:border-r-0 bg-gray-100">
+              <div key={day} className="p-3 text-center text-sm font-bold text-gray-700 border-2 border-black">
                 {day}
               </div>
             ))}
           </div>
-
-          {/* Calendar Grid */}
           <div className="grid grid-cols-7">
             {days}
           </div>
@@ -430,155 +443,141 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
 
   if (!member) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading member details...</p>
-        </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={onBack}
-              className="inline-flex items-center text-gray-600 hover:text-gray-800 transition-colors duration-200"
-            >
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Back
-            </button>
-            
-            <button
-              onClick={onProfileClick}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
-            >
-              <User className="h-4 w-4 mr-2" />
-              Profile
-            </button>
-          </div>
-        </div>
-      </div>
-
+    <div className="min-h-screen bg-gray-50">
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {/* Member Profile Card */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8 mb-8">
-          <div className="flex items-start space-x-6">
-            <div className="flex-shrink-0">
-              <div className="h-24 w-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                {member.name.split(' ').map(n => n[0]).join('')}
+        {/* Header */}
+        <div className="mb-8">
+          <button
+            onClick={onBack}
+            className="inline-flex items-center text-gray-600 hover:text-gray-800 mb-4 transition-colors duration-200"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </button>
+          
+          <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
+            <div className="flex items-start space-x-6">
+              <div className="flex-shrink-0">
+                <div className="h-20 w-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold">
+                  {member.name.split(' ').map(n => n[0]).join('')}
+                </div>
               </div>
-            </div>
-            
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{member.name}</h1>
-              <p className="text-xl text-blue-600 font-medium mb-4">{member.role}</p>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="flex items-center text-gray-600">
-                  <Mail className="h-4 w-4 mr-3 text-blue-500" />
-                  {member.email}
+              <div className="flex-1">
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">{member.name}</h1>
+                <p className="text-lg text-gray-600 mb-4">{member.role}</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center text-gray-600">
+                    <Mail className="h-4 w-4 mr-2" />
+                    {member.email}
+                  </div>
+                  {member.phone && (
+                    <div className="flex items-center text-gray-600">
+                      <Phone className="h-4 w-4 mr-2" />
+                      {member.phone}
+                    </div>
+                  )}
+                  {member.location && (
+                    <div className="flex items-center text-gray-600">
+                      <MapPin className="h-4 w-4 mr-2" />
+                      {member.location}
+                    </div>
+                  )}
                 </div>
-                {member.phone && (
-                  <div className="flex items-center text-gray-600">
-                    <Phone className="h-4 w-4 mr-3 text-green-500" />
-                    {member.phone}
-                  </div>
-                )}
-                {member.location && (
-                  <div className="flex items-center text-gray-600">
-                    <MapPin className="h-4 w-4 mr-3 text-red-500" />
-                    {member.location}
-                  </div>
-                )}
               </div>
             </div>
-          </div>
 
-          {/* Internship Info */}
-          {member.internship_start && member.internship_end && (
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-6 border border-orange-200">
-                <div className="flex items-center mb-4">
-                  <Calendar className="h-6 w-6 text-orange-600 mr-3" />
-                  <h3 className="text-xl font-semibold text-orange-800">Internship Period</h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div className="bg-white rounded-lg p-4 border border-orange-200">
-                    <span className="text-orange-700 font-medium block mb-1">Start Date</span>
-                    <span className="text-orange-900 font-semibold">{formatDate(member.internship_start)}</span>
+            {/* Internship Info */}
+            {member.internship_start && member.internship_end && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg p-4 border border-orange-200">
+                  <div className="flex items-center mb-3">
+                    <Calendar className="h-5 w-5 text-orange-600 mr-2" />
+                    <h3 className="text-lg font-semibold text-orange-800">Internship Period</h3>
                   </div>
-                  <div className="bg-white rounded-lg p-4 border border-orange-200">
-                    <span className="text-orange-700 font-medium block mb-1">End Date</span>
-                    <span className="text-orange-900 font-semibold">{formatDate(member.internship_end)}</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-orange-700 font-medium">Start Date:</span>
+                      <span className="text-orange-900">{formatDate(member.internship_start)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-orange-700 font-medium">End Date:</span>
+                      <span className="text-orange-900">{formatDate(member.internship_end)}</span>
+                    </div>
                   </div>
-                  <div className="bg-white rounded-lg p-4 border border-orange-200">
-                    <span className="text-orange-700 font-medium block mb-1">Duration</span>
-                    <span className="text-orange-900 font-semibold">
-                      {Math.ceil((new Date(member.internship_end).getTime() - new Date(member.internship_start).getTime()) / (1000 * 60 * 60 * 24 * 30))} months
-                    </span>
+                  <div className="pt-2 border-t border-orange-200 mt-2">
+                    <div className="flex justify-between">
+                      <span className="text-orange-700 font-medium">Duration:</span>
+                      <span className="text-orange-900">
+                        {Math.ceil((new Date(member.internship_end).getTime() - new Date(member.internship_start).getTime()) / (1000 * 60 * 60 * 24 * 30))} months
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Description Section */}
           <div className="mt-8 pt-6 border-t border-gray-200">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-gray-900">About</h3>
+              <h3 className="text-lg font-semibold text-gray-900">About</h3>
               {canEdit && !isEditingDescription && (
                 <button
                   onClick={() => setIsEditingDescription(true)}
-                  className="inline-flex items-center px-3 py-2 bg-blue-100 text-blue-700 text-sm rounded-lg hover:bg-blue-200 transition-colors duration-200"
+                  className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 transition-colors duration-200"
                 >
-                  <Edit className="h-4 w-4 mr-2" />
+                  <Edit className="h-3 w-3 mr-1" />
                   Edit
                 </button>
               )}
             </div>
 
             {isEditingDescription ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <textarea
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
                   placeholder="Tell us about this member..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
                   rows={4}
                 />
-                <div className="flex space-x-3">
+                <div className="flex space-x-2">
                   <button
                     onClick={handleSaveDescription}
                     disabled={loading === 'save-description'}
-                    className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors duration-200 disabled:opacity-50"
+                    className="inline-flex items-center px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors duration-200 disabled:opacity-50"
                   >
                     {loading === 'save-description' ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
                     ) : (
-                      <Save className="h-4 w-4 mr-2" />
+                      <Save className="h-3 w-3 mr-1" />
                     )}
                     Save
                   </button>
                   <button
                     onClick={handleCancelDescription}
-                    className="inline-flex items-center px-4 py-2 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors duration-200"
+                    className="inline-flex items-center px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 transition-colors duration-200"
                   >
-                    <X className="h-4 w-4 mr-2" />
+                    <X className="h-3 w-3 mr-1" />
                     Cancel
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="bg-gray-50 rounded-lg p-6">
+              <div className="bg-gray-50 rounded-lg p-4">
                 {member.description ? (
-                  <p className="text-gray-700 leading-relaxed">{member.description}</p>
+                  <p className="text-gray-700 text-sm leading-relaxed">{member.description}</p>
                 ) : (
-                  <p className="text-gray-500 italic">
+                  <p className="text-gray-500 text-sm italic">
                     {canEdit ? 'No description added yet. Click edit to add one.' : 'No description available.'}
                   </p>
                 )}
@@ -587,35 +586,35 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
           </div>
 
           {/* Skills Section */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
+          <div className="mt-6 pt-6 border-t border-gray-200">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-gray-900">Skills</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Skills</h3>
               {canEdit && !isEditingSkills && (
                 <button
                   onClick={() => setIsEditingSkills(true)}
-                  className="inline-flex items-center px-3 py-2 bg-blue-100 text-blue-700 text-sm rounded-lg hover:bg-blue-200 transition-colors duration-200"
+                  className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 transition-colors duration-200"
                 >
-                  <Edit className="h-4 w-4 mr-2" />
+                  <Edit className="h-3 w-3 mr-1" />
                   Edit
                 </button>
               )}
             </div>
 
             {isEditingSkills ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {/* Add new skill */}
-                <div className="flex space-x-3">
+                <div className="flex space-x-2">
                   <input
                     type="text"
                     value={newSkill}
                     onChange={(e) => setNewSkill(e.target.value)}
                     placeholder="Add a skill..."
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                     onKeyPress={(e) => e.key === 'Enter' && handleAddSkill()}
                   />
                   <button
                     onClick={handleAddSkill}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                    className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
                   >
                     <Plus className="h-4 w-4" />
                   </button>
@@ -624,55 +623,55 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
                 {/* Skills list */}
                 <div className="space-y-2">
                   {editSkills.map((skill, index) => (
-                    <div key={index} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                      <span className="text-gray-700">{skill}</span>
+                    <div key={index} className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
+                      <span className="text-sm text-gray-700">{skill}</span>
                       <button
                         onClick={() => handleRemoveSkill(skill)}
                         className="text-red-500 hover:text-red-700 transition-colors duration-200"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3 w-3" />
                       </button>
                     </div>
                   ))}
                 </div>
 
-                <div className="flex space-x-3">
+                <div className="flex space-x-2">
                   <button
                     onClick={handleSaveSkills}
                     disabled={loading === 'save-skills'}
-                    className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors duration-200 disabled:opacity-50"
+                    className="inline-flex items-center px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors duration-200 disabled:opacity-50"
                   >
                     {loading === 'save-skills' ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
                     ) : (
-                      <Save className="h-4 w-4 mr-2" />
+                      <Save className="h-3 w-3 mr-1" />
                     )}
                     Save
                   </button>
                   <button
                     onClick={handleCancelSkills}
-                    className="inline-flex items-center px-4 py-2 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors duration-200"
+                    className="inline-flex items-center px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 transition-colors duration-200"
                   >
-                    <X className="h-4 w-4 mr-2" />
+                    <X className="h-3 w-3 mr-1" />
                     Cancel
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="bg-gray-50 rounded-lg p-6">
+              <div className="bg-gray-50 rounded-lg p-4">
                 {member.skills && member.skills.length > 0 ? (
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap gap-2">
                     {member.skills.map((skill, index) => (
                       <span
                         key={index}
-                        className="inline-flex items-center px-3 py-2 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-200"
+                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
                       >
                         {skill}
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500 italic">
+                  <p className="text-gray-500 text-sm italic">
                     {canEdit ? 'No skills added yet. Click edit to add some.' : 'No skills listed.'}
                   </p>
                 )}
@@ -682,24 +681,24 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
         </div>
 
         {/* View Mode Toggle */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center space-x-1 bg-white rounded-lg shadow-md border border-gray-200 p-1">
             <button
               onClick={() => setViewMode('recent')}
-              className={`px-6 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
                 viewMode === 'recent'
-                  ? 'bg-blue-500 text-white shadow-md'
-                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-600 hover:text-gray-800'
               }`}
             >
               Recent Standups
             </button>
             <button
               onClick={() => setViewMode('calendar')}
-              className={`px-6 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
                 viewMode === 'calendar'
-                  ? 'bg-blue-500 text-white shadow-md'
-                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-600 hover:text-gray-800'
               }`}
             >
               Calendar View
@@ -710,7 +709,7 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
         {/* Content */}
         {viewMode === 'recent' ? (
           <div>
-            <h3 className="text-2xl font-semibold text-gray-900 mb-6">
+            <h3 className="text-xl font-semibold text-gray-900 mb-6">
               Recent Standups ({recentStandups.length})
             </h3>
             
@@ -721,14 +720,14 @@ const MemberDetailPage: React.FC<MemberDetailPageProps> = ({
                 ))}
               </div>
             ) : (
-              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-12 text-center">
-                <div className="text-gray-400 mb-6">
-                  <AlertCircle className="h-16 w-16 mx-auto" />
+              <div className="bg-white rounded-lg shadow-md border border-gray-200 p-12 text-center">
+                <div className="text-gray-400 mb-4">
+                  <AlertCircle className="h-12 w-12 mx-auto" />
                 </div>
-                <h3 className="text-xl font-medium text-gray-900 mb-3">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
                   No standups yet
                 </h3>
-                <p className="text-gray-500 text-lg">
+                <p className="text-gray-500">
                   This member hasn't submitted any standups yet.
                 </p>
               </div>

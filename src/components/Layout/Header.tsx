@@ -151,11 +151,44 @@ const Header: React.FC<HeaderProps> = ({
                     onClick={onProfileClick}
                     className="flex items-center space-x-2 hover:bg-gray-50 rounded-lg p-2 transition-colors duration-200"
                   >
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center ring-2 ring-gray-200">
-                      <span className="text-white font-medium text-sm">
-                        {user.name.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
+                    
+                    {user.profile_picture ? (
+
+
+                      <img
+
+
+                        src={user.profile_picture}
+
+
+                        alt={user.name}
+
+
+                        className="h-10 w-10 rounded-full object-cover ring-2 ring-gray-200"
+
+
+                      />
+
+
+                    ) : (
+
+
+                      <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center ring-2 ring-gray-200">
+
+
+                        <span className="text-white font-medium text-sm">
+
+
+                          {user.name.charAt(0).toUpperCase()}
+
+
+                        </span>
+
+
+                      </div>
+
+
+                    )}
                     <Settings className="h-4 w-4 text-gray-400" />
                   </button>
                   

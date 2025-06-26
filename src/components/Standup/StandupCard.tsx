@@ -69,7 +69,7 @@ const StandupCard: React.FC<StandupCardProps> = ({ standup, onMemberClick, onSta
           <img
             src={standup.memberAvatar}
             alt={standup.memberName}
-            className="h-10 w-10 rounded-full ring-2 ring-gray-200"
+            className="h-10 w-10 rounded-full ring-2 ring-gray-200 object-cover"
           />
           <div>
             <div className="flex items-center space-x-2">

@@ -43,6 +43,9 @@ export type Database = {
           password: string | null;
           admin: boolean | null;
           mentor_id: number | null;
+          description: string | null;
+          skills: string[] | null;
+          profile_picture: string | null;
         };
         Insert: {
           id?: number;
@@ -57,6 +60,9 @@ export type Database = {
           password?: string | null;
           admin?: boolean | null;
           mentor_id?: number | null;
+          description?: string | null;
+          skills?: string[] | null;
+          profile_picture?: string | null;
         };
         Update: {
           id?: number;
@@ -71,6 +77,8 @@ export type Database = {
           password?: string | null;
           admin?: boolean | null;
           mentor_id?: number | null;
+          description?: string | null;
+          profile_picture?: string | null;
         };
       };
       standups: {

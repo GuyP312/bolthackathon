@@ -57,7 +57,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onClick, standupCount =
     >
       <div className="flex items-center mb-4">
         <img
-          src={member.avatar}
+          src={member.profile_picture || member.avatar}
           alt={member.name}
           className="h-16 w-16 rounded-full ring-4 ring-gray-100 group-hover:ring-blue-200 transition-all duration-200"
         />

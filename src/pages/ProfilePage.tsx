@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, User, Mail, Briefcase, Settings, UserPlus, AlertCircle, CheckCircle, Search, RefreshCw, Calendar, FileText, Clock, Edit, Save, X, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, User, Mail, Briefcase, Settings, UserPlus, AlertCircle, CheckCircle, Search, RefreshCw, Calendar, FileText, Clock, Edit, Save, X, Plus, Trash2, Camera } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import Header from '../components/Layout/Header';
 import StandupCard from '../components/Standup/StandupCard';
+import ProfilePictureUpload from '../components/ProfilePictureUpload';
 import { Member } from '../types';
 
 interface ProfilePageProps {
@@ -22,7 +23,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onBack, onLeaveManagement, on
     refreshCurrentUser,
     getStandupsByMemberId,
     leaves,
-    updateProfile
+    updateProfile,
+    uploadProfilePicture
   } = useApp();
   
   const [showMentorAssignment, setShowMentorAssignment] = useState(false);
@@ -32,6 +34,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onBack, onLeaveManagement, on
   const [fetchingMentors, setFetchingMentors] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showProfilePictureUpload, setShowProfilePictureUpload] = useState(false);
 
   // Profile editing states
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -199,6 +202,68 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onBack, onLeaveManagement, on
     return 'Unknown';
   };
 
+  const handleProfilePictureUpload = async (imageUrl: string) => {
+
+
+    setLoading('upload-profile-picture');
+
+
+    try {
+
+
+      const result = await uploadProfilePicture(imageUrl);
+
+
+      if (result.success) {
+
+
+        setShowProfilePictureUpload(false);
+
+
+        setMessage({ type: 'success', text: 'Profile picture updated successfully! All pages will show your new photo.' });
+
+
+        
+
+
+        // Clear the message after 5 seconds
+
+
+        setTimeout(() => {
+
+
+          setMessage(null);
+
+
+        }, 5000);
+
+
+      } else {
+
+
+        setMessage({ type: 'error', text: result.error || 'Failed to upload profile picture' });
+
+
+      }
+
+
+    } catch (error) {
+
+
+      setMessage({ type: 'error', text: 'An error occurred while uploading profile picture' });
+
+
+    } finally {
+
+
+      setLoading(null);
+
+
+    }
+
+
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -251,8 +316,64 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onBack, onLeaveManagement, on
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-md border border-gray-200 p-8 mb-8">
               <div className="text-center mb-6">
-                <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-4 rounded-full inline-block mb-4">
-                  <User className="h-12 w-12 text-white" />
+                                {/* Profile Picture */}
+
+
+                <div className="relative inline-block mb-4">
+
+
+                  {user.profile_picture ? (
+
+
+                    <img
+
+
+                      src={user.profile_picture}
+
+
+                      alt={user.name}
+
+
+                      className="w-24 h-24 rounded-full object-cover border-4 border-gray-200"
+
+
+                    />
+
+
+                  ) : (
+
+
+                    <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-4 rounded-full inline-block w-24 h-24 flex items-center justify-center">
+
+
+                      <User className="h-12 w-12 text-white" />
+
+
+                    </div>
+
+
+                  )}
+
+
+                  <button
+
+
+                    onClick={() => setShowProfilePictureUpload(true)}
+
+
+                    className="absolute -bottom-2 -right-2 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full shadow-lg transition-colors duration-200"
+
+
+                    title="Change profile picture"
+
+
+                  >
+
+
+                    <Camera className="h-4 w-4" />
+
+
+                  </button>
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">{user.name}</h2>
                 <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mb-4 ${
@@ -738,6 +859,28 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onBack, onLeaveManagement, on
           </div>
         )}
       </main>
+            {/* Profile Picture Upload Modal */}
+
+
+      {showProfilePictureUpload && (
+
+
+        <ProfilePictureUpload
+
+
+          onImageUpdate={handleProfilePictureUpload}
+
+
+          onClose={() => setShowProfilePictureUpload(false)}
+
+
+          loading={loading === 'upload-profile-picture'}
+
+
+        />
+
+
+      )}
     </div>
   );
 };

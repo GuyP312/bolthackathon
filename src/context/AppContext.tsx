@@ -17,7 +17,8 @@ interface AppContextType {
   rejectLeave: (leaveId: number) => Promise<{ success: boolean; error?: string }>;
   cancelLeave: (leaveId: number) => Promise<{ success: boolean; error?: string }>;
   assignMentor: (mentorId: number) => Promise<{ success: boolean; error?: string }>;
-  updateProfile: (profileData: { description?: string; skills?: string[] }) => Promise<{ success: boolean; error?: string }>;
+  updateProfile: (profileData: { description?: string; skills?: string[]; profile_picture?: string }) => Promise<{ success: boolean; error?: string }>;
+  uploadProfilePicture: (imageUrl: string) => Promise<{ success: boolean; error?: string; publicUrl?: string }>;
   refreshData: () => Promise<void>;
   getTeamById: (id: number) => Team | undefined;
   getMembersByTeamId: (teamId: number) => Member[];
@@ -90,13 +91,13 @@ const transformStandupData = (standup: any): Standup => {
     blockers,
     memberId: standup.member_id?.toString() || '',
     memberName: standup.member?.name || 'Unknown Member',
-    memberAvatar: `https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face`,
+    memberAvatar: standup.member?.profile_picture || `https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face`,
     timestamp: standup.created_at || new Date().toISOString()
   };
 };
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
-  const { user, setUser } = useAuth();
+  const { user, setUser, refreshCurrentUser: authRefreshCurrentUser } = useAuth();
   const [teams, setTeams] = useState<Team[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [standups, setStandups] = useState<Standup[]>([]);
@@ -247,48 +248,32 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     if (!user) return;
     
     try {
-      console.log('Refreshing current user data...');
-      const { data: updatedMember, error } = await supabase
-        .from('members')
-        .select(`
-          *,
-          team:teams(*)
-        `)
-        .eq('id', user.id)
-        .single();
+      
+      console.log('Refreshing current user data and members...');
 
-      if (!error && updatedMember) {
-        // Fetch mentor information separately if mentor_id exists
-        let mentorData = null;
-        if (updatedMember.mentor_id) {
-          const { data: mentor } = await supabase
-            .from('members')
-            .select('id, name, email, role')
-            .eq('id', updatedMember.mentor_id)
-            .single();
-          mentorData = mentor;
-        }
 
-        const updatedUser = {
-          ...user,
-          mentor_id: updatedMember.mentor_id,
-          team: updatedMember.team,
-          description: updatedMember.description || '',
-          skills: updatedMember.skills || [],
-        };
-        
-        // Update user in auth context
-        if (setUser) {
-          setUser(updatedUser);
-        }
-        
-        // Update localStorage
-        localStorage.setItem('auth_user', JSON.stringify(updatedUser));
-        
-        console.log('Current user refreshed successfully:', updatedUser);
-      } else {
-        console.error('Error refreshing current user:', error);
-      }
+      
+
+
+      // Refresh the user data in AuthContext (this updates localStorage too)
+
+
+      await authRefreshCurrentUser();
+
+
+      
+
+
+      // Also refresh members data to ensure all components show updated profile pictures
+
+
+      await fetchMembers();
+
+
+      
+
+
+      console.log('Current user and members data refreshed successfully');
     } catch (error) {
       console.error('Error in refreshCurrentUser:', error);
     }
@@ -554,7 +539,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
-  const updateProfile = async (profileData: { description?: string; skills?: string[] }): Promise<{ success: boolean; error?: string }> => {
+  const updateProfile = async (profileData: { description?: string; skills?: string[]; profile_picture?: string }): Promise<{ success: boolean; error?: string }> => {
     if (!user) return { success: false, error: 'Not authenticated' };
 
     try {
@@ -583,6 +568,436 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       console.error('Profile update error:', error);
       return { success: false, error: 'An error occurred' };
     }
+  };
+    const uploadProfilePicture = async (imageUrl: string): Promise<{ success: boolean; error?: string; publicUrl?: string }> => {
+
+
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+
+
+
+
+    try {
+
+
+      console.log('Uploading profile picture for user:', user.id);
+
+
+      
+
+
+      // Convert data URL to blob
+
+
+      const response = await fetch(imageUrl);
+
+
+      const blob = await response.blob();
+
+
+      
+
+
+      // Generate unique filename with proper extension
+
+
+      const fileExtension = blob.type.includes('png') ? 'png' : 'jpg';
+
+
+      const fileName = `${user.id}-${Date.now()}.${fileExtension}`;
+
+
+      const filePath = `profiles/${fileName}`;
+
+
+      
+
+
+      console.log('Attempting to upload file:', filePath, 'Size:', blob.size, 'Type:', blob.type);
+
+
+      
+
+
+      // Try to upload to Supabase storage first
+
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+
+
+        .from('profile-pictures')
+
+
+        .upload(filePath, blob, {
+
+
+          cacheControl: '3600',
+
+
+          upsert: true,
+
+
+          contentType: blob.type
+
+
+        });
+
+
+
+
+
+      if (uploadError) {
+
+
+        console.error('Error uploading to storage:', uploadError);
+
+
+        
+
+
+        // If bucket doesn't exist, try to create it
+
+
+        if (uploadError.message?.includes('Bucket not found') || uploadError.message?.includes('404')) {
+
+
+          console.log('Bucket not found, trying to create it...');
+
+
+          
+
+
+          const { error: bucketError } = await supabase.storage.createBucket('profile-pictures', {
+
+
+            public: true,
+
+
+            allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+
+
+            fileSizeLimit: 5242880 // 5MB
+
+
+          });
+
+
+          
+
+
+          if (bucketError) {
+
+
+            console.error('Failed to create bucket, using base64 fallback:', bucketError);
+
+
+          } else {
+
+
+            console.log('Bucket created successfully, retrying upload...');
+
+
+            
+
+
+            // Retry upload after creating bucket
+
+
+            const { error: retryError } = await supabase.storage
+
+
+              .from('profile-pictures')
+
+
+              .upload(filePath, blob, {
+
+
+                cacheControl: '3600',
+
+
+                upsert: true,
+
+
+                contentType: blob.type
+
+
+              });
+
+
+              
+
+
+            if (!retryError) {
+
+
+              // Success on retry
+
+
+              const { data: urlData } = supabase.storage
+
+
+                .from('profile-pictures')
+
+
+                .getPublicUrl(filePath);
+
+
+
+
+
+              const publicUrl = urlData?.publicUrl;
+
+
+              if (publicUrl) {
+
+
+                const updateResult = await updateProfile({ profile_picture: publicUrl });
+
+
+                if (updateResult.success) {
+
+
+                  console.log('Profile picture uploaded successfully after bucket creation:', publicUrl);
+
+
+                  // Refresh all user data and members to update profile pictures everywhere
+
+
+                  await refreshCurrentUser();
+
+
+                  return { success: true, publicUrl };
+
+
+                }
+
+
+              }
+
+
+            }
+
+
+            console.log('Retry upload failed, falling back to base64');
+
+
+          }
+
+
+        }
+
+
+        
+
+
+        // Fallback: Store as base64 data URL directly in database
+
+
+        console.log('Falling back to base64 storage in database...');
+
+
+        
+
+
+        const updateResult = await updateProfile({ profile_picture: imageUrl });
+
+
+        
+
+
+        if (!updateResult.success) {
+
+
+          return { success: false, error: updateResult.error };
+
+
+        }
+
+
+
+
+
+        console.log('Profile picture saved as base64 in database');
+
+
+        
+
+
+        // Refresh all user data and members to update profile pictures everywhere
+
+
+        await refreshCurrentUser();
+
+
+        
+
+
+        return { success: true, publicUrl: imageUrl };
+
+
+      }
+
+
+
+
+
+      console.log('Upload successful:', uploadData);
+
+
+
+
+
+      // Get public URL if storage upload succeeded
+
+
+      const { data: urlData } = supabase.storage
+
+
+        .from('profile-pictures')
+
+
+        .getPublicUrl(filePath);
+
+
+
+
+
+      const publicUrl = urlData?.publicUrl;
+
+
+
+
+
+      if (!publicUrl) {
+
+
+        console.error('Failed to get public URL');
+
+
+        // Fallback to base64 if public URL fails
+
+
+        const updateResult = await updateProfile({ profile_picture: imageUrl });
+
+
+        return updateResult.success 
+
+
+          ? { success: true, publicUrl: imageUrl }
+
+
+          : { success: false, error: updateResult.error };
+
+
+      }
+
+
+
+
+
+      console.log('Public URL obtained:', publicUrl);
+
+
+
+
+
+      // Update user profile with new image URL
+
+
+      const updateResult = await updateProfile({ profile_picture: publicUrl });
+
+
+      
+
+
+      if (!updateResult.success) {
+
+
+        return { success: false, error: updateResult.error };
+
+
+      }
+
+
+
+
+
+      console.log('Profile picture uploaded successfully:', publicUrl);
+
+
+      
+
+
+      // Refresh all user data and members to update profile pictures everywhere
+
+
+      await refreshCurrentUser();
+
+
+      
+
+
+      return { success: true, publicUrl };
+
+
+    } catch (error) {
+
+
+      console.error('Profile picture upload error:', error);
+
+
+      
+
+
+      // Final fallback to base64
+
+
+      try {
+
+
+        console.log('Attempting final fallback to base64...');
+
+
+        const updateResult = await updateProfile({ profile_picture: imageUrl });
+
+
+        if (updateResult.success) {
+
+
+          // Refresh all user data and members to update profile pictures everywhere
+
+
+          await refreshCurrentUser();
+
+
+        }
+
+
+        return updateResult.success 
+
+
+          ? { success: true, publicUrl: imageUrl }
+
+
+          : { success: false, error: 'Failed to save profile picture' };
+
+
+      } catch (fallbackError) {
+
+
+        console.error('Fallback also failed:', fallbackError);
+
+
+        return { success: false, error: 'An error occurred while uploading the image' };
+
+
+      }
+
+
+    }
+
+
   };
 
   const getTeamById = (id: number): Team | undefined => {
@@ -734,6 +1149,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       cancelLeave,
       assignMentor,
       updateProfile,
+      uploadProfilePicture,
       refreshData,
       getTeamById,
       getMembersByTeamId,

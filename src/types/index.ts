@@ -2,6 +2,7 @@ export interface Team {
   id: number;
   name: string;
   description: string;
+  profile_picture?: string; // Add profile_picture field
 }
 
 export interface Member {
@@ -20,12 +21,14 @@ export interface Member {
   team?: Team;
   description?: string; // Add description field
   skills?: string[]; // Add skills field
+  profile_picture?: string; // Add profile_picture field
 }
 
 export interface Task {
   id: string;
   text: string;
   completed: boolean;
+  profile_picture?: string; // Add profile_picture field
 }
 
 export interface Standup {
@@ -71,4 +74,82 @@ export interface AuthUser {
   team?: Team;
   description?: string; // Add description field
   skills?: string[]; // Add skills field
+  profile_picture?: string; // Add profile_picture field
 }
+
+export interface TeamMember {
+
+
+  id: string;
+
+
+  name: string;
+
+
+  email: string;
+
+
+  avatar: string;
+
+
+  role: string;
+
+
+  teamId: string;
+
+
+  joinDate: string;
+
+
+  position: 'full-time' | 'intern' | 'contractor';
+
+
+  internshipStart?: string;
+
+
+  internshipEnd?: string;
+
+
+  profile_picture?: string;
+
+
+}
+
+export interface User {
+
+
+  id: string;
+
+
+  name: string;
+
+
+  email: string;
+
+
+  avatar: string;
+
+
+  role: string;
+}
+
+
+export interface teamMembership {
+
+
+    id: string;
+
+
+    teamId: string;
+
+
+    role: string;
+
+
+    joinDate: string;
+
+
+    position: string;
+
+
+  }

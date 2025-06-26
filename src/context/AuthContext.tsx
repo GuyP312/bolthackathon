@@ -9,6 +9,7 @@ interface AuthContextType {
   register: (userData: RegisterData) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   setUser: (user: AuthUser | null) => void;
+  refreshCurrentUser: () => Promise<void>;
 }
 
 interface RegisterData {
@@ -98,6 +99,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         team: member.team || undefined,
         description: member.description || '',
         skills: member.skills || [],
+        profile_picture: member.profile_picture || undefined,
       };
 
       setUser(authUser);
@@ -167,6 +169,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         team: newMember.team || undefined,
         description: newMember.description || '',
         skills: newMember.skills || [],
+        profile_picture: newMember.profile_picture || undefined,
       };
 
       setUser(authUser);
@@ -186,6 +189,131 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('auth_user');
   };
 
+  const refreshCurrentUser = async () => {
+
+
+    if (!user) return;
+
+
+
+
+
+    try {
+
+
+      console.log('Refreshing current user data for:', user.id);
+
+
+      
+
+
+      const { data: member, error } = await supabase
+
+
+        .from('members')
+
+
+        .select(`
+
+
+          *,
+
+
+          team:teams(*)
+
+
+        `)
+
+
+        .eq('id', user.id)
+
+
+        .single();
+
+
+
+
+
+      if (error || !member) {
+
+
+        console.error('Error refreshing user data:', error);
+
+
+        return;
+
+
+      }
+
+
+
+
+
+      const updatedUser: AuthUser = {
+
+
+        id: member.id,
+
+
+        name: member.name || '',
+
+
+        email: member.email || '',
+
+
+        username: member.username || '',
+
+
+        role: member.role || 'trainee',
+
+
+        admin: member.admin || false,
+
+
+        team_id: member.team_id || 0,
+
+
+        mentor_id: member.mentor_id || undefined,
+
+
+        team: member.team || undefined,
+
+
+        description: member.description || '',
+
+
+        skills: member.skills || [],
+
+
+        profile_picture: member.profile_picture || undefined,
+
+
+      };
+
+
+
+
+
+      setUser(updatedUser);
+
+
+      localStorage.setItem('auth_user', JSON.stringify(updatedUser));
+
+
+      console.log('User data refreshed successfully:', updatedUser);
+
+
+    } catch (error) {
+
+
+      console.error('Error refreshing current user:', error);
+
+
+    }
+
+
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -194,6 +322,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       register,
       logout,
       setUser,
+      refreshCurrentUser,
     }}>
       {children}
     </AuthContext.Provider>

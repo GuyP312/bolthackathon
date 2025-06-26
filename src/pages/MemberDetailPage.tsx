@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
   Mail, 
@@ -13,7 +12,8 @@ import {
   Trash2,
   AlertCircle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  User
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -44,9 +44,17 @@ interface Standup {
   created_at: string;
 }
 
-const MemberDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+interface MemberDetailPageProps {
+  memberId: string;
+  onBack: () => void;
+  onProfileClick: () => void;
+}
+
+const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ 
+  memberId, 
+  onBack, 
+  onProfileClick 
+}) => {
   const { user } = useAuth();
   
   const [member, setMember] = useState<Member | null>(null);
@@ -63,27 +71,27 @@ const MemberDetailPage: React.FC = () => {
   const [editSkills, setEditSkills] = useState<string[]>([]);
   const [newSkill, setNewSkill] = useState('');
 
-  const canEdit = user?.id === id;
+  const canEdit = user?.id === memberId;
 
   useEffect(() => {
-    if (id) {
+    if (memberId) {
       fetchMember();
       fetchRecentStandups();
     }
-  }, [id]);
+  }, [memberId]);
 
   useEffect(() => {
-    if (viewMode === 'calendar' && id) {
+    if (viewMode === 'calendar' && memberId) {
       fetchCalendarStandups();
     }
-  }, [viewMode, currentDate, id]);
+  }, [viewMode, currentDate, memberId]);
 
   const fetchMember = async () => {
     try {
       const { data, error } = await supabase
         .from('members')
         .select('*')
-        .eq('id', id)
+        .eq('id', memberId)
         .single();
 
       if (error) throw error;
@@ -100,7 +108,7 @@ const MemberDetailPage: React.FC = () => {
       const { data, error } = await supabase
         .from('standups')
         .select('*')
-        .eq('member_id', id)
+        .eq('member_id', memberId)
         .order('date', { ascending: false })
         .limit(10);
 
@@ -119,7 +127,7 @@ const MemberDetailPage: React.FC = () => {
       const { data, error } = await supabase
         .from('standups')
         .select('*')
-        .eq('member_id', id)
+        .eq('member_id', memberId)
         .gte('date', startOfMonth.toISOString().split('T')[0])
         .lte('date', endOfMonth.toISOString().split('T')[0])
         .order('date', { ascending: false });
@@ -301,141 +309,155 @@ const MemberDetailPage: React.FC = () => {
 
   if (!member) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading member details...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={onBack}
+              className="inline-flex items-center text-gray-600 hover:text-gray-800 transition-colors duration-200"
+            >
+              <ArrowLeft className="h-5 w-5 mr-2" />
+              Back
+            </button>
+            
+            <button
+              onClick={onProfileClick}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+            >
+              <User className="h-4 w-4 mr-2" />
+              Profile
+            </button>
+          </div>
+        </div>
+      </div>
+
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <button
-            onClick={() => navigate(-1)}
-            className="inline-flex items-center text-gray-600 hover:text-gray-800 mb-4 transition-colors duration-200"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </button>
-          
-          <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-            <div className="flex items-start space-x-6">
-              <div className="flex-shrink-0">
-                <div className="h-20 w-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold">
-                  {member.name.split(' ').map(n => n[0]).join('')}
-                </div>
+        {/* Member Profile Card */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8 mb-8">
+          <div className="flex items-start space-x-6">
+            <div className="flex-shrink-0">
+              <div className="h-24 w-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                {member.name.split(' ').map(n => n[0]).join('')}
               </div>
+            </div>
+            
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">{member.name}</h1>
+              <p className="text-xl text-blue-600 font-medium mb-4">{member.role}</p>
               
-              <div className="flex-1">
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">{member.name}</h1>
-                <p className="text-lg text-gray-600 mb-4">{member.role}</p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="flex items-center text-gray-600">
+                  <Mail className="h-4 w-4 mr-3 text-blue-500" />
+                  {member.email}
+                </div>
+                {member.phone && (
                   <div className="flex items-center text-gray-600">
-                    <Mail className="h-4 w-4 mr-2" />
-                    {member.email}
+                    <Phone className="h-4 w-4 mr-3 text-green-500" />
+                    {member.phone}
                   </div>
-                  {member.phone && (
-                    <div className="flex items-center text-gray-600">
-                      <Phone className="h-4 w-4 mr-2" />
-                      {member.phone}
-                    </div>
-                  )}
-                  {member.location && (
-                    <div className="flex items-center text-gray-600">
-                      <MapPin className="h-4 w-4 mr-2" />
-                      {member.location}
-                    </div>
-                  )}
+                )}
+                {member.location && (
+                  <div className="flex items-center text-gray-600">
+                    <MapPin className="h-4 w-4 mr-3 text-red-500" />
+                    {member.location}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Internship Info */}
+          {member.internship_start && member.internship_end && (
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-6 border border-orange-200">
+                <div className="flex items-center mb-4">
+                  <Calendar className="h-6 w-6 text-orange-600 mr-3" />
+                  <h3 className="text-xl font-semibold text-orange-800">Internship Period</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div className="bg-white rounded-lg p-4 border border-orange-200">
+                    <span className="text-orange-700 font-medium block mb-1">Start Date</span>
+                    <span className="text-orange-900 font-semibold">{formatDate(member.internship_start)}</span>
+                  </div>
+                  <div className="bg-white rounded-lg p-4 border border-orange-200">
+                    <span className="text-orange-700 font-medium block mb-1">End Date</span>
+                    <span className="text-orange-900 font-semibold">{formatDate(member.internship_end)}</span>
+                  </div>
+                  <div className="bg-white rounded-lg p-4 border border-orange-200">
+                    <span className="text-orange-700 font-medium block mb-1">Duration</span>
+                    <span className="text-orange-900 font-semibold">
+                      {Math.ceil((new Date(member.internship_end).getTime() - new Date(member.internship_start).getTime()) / (1000 * 60 * 60 * 24 * 30))} months
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-
-            {/* Internship Info */}
-            {member.internship_start && member.internship_end && (
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg p-4 border border-orange-200">
-                  <div className="flex items-center mb-3">
-                    <Calendar className="h-5 w-5 text-orange-600 mr-2" />
-                    <h3 className="text-lg font-semibold text-orange-800">Internship Period</h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-orange-700 font-medium">Start Date:</span>
-                      <span className="text-orange-900">{formatDate(member.internship_start)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-orange-700 font-medium">End Date:</span>
-                      <span className="text-orange-900">{formatDate(member.internship_end)}</span>
-                    </div>
-                  </div>
-                  <div className="pt-2 border-t border-orange-200 mt-2">
-                    <div className="flex justify-between">
-                      <span className="text-orange-700 font-medium">Duration:</span>
-                      <span className="text-orange-900">
-                        {Math.ceil((new Date(member.internship_end).getTime() - new Date(member.internship_start).getTime()) / (1000 * 60 * 60 * 24 * 30))} months
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Description Section */}
           <div className="mt-8 pt-6 border-t border-gray-200">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">About</h3>
+              <h3 className="text-xl font-semibold text-gray-900">About</h3>
               {canEdit && !isEditingDescription && (
                 <button
                   onClick={() => setIsEditingDescription(true)}
-                  className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 transition-colors duration-200"
+                  className="inline-flex items-center px-3 py-2 bg-blue-100 text-blue-700 text-sm rounded-lg hover:bg-blue-200 transition-colors duration-200"
                 >
-                  <Edit className="h-3 w-3 mr-1" />
+                  <Edit className="h-4 w-4 mr-2" />
                   Edit
                 </button>
               )}
             </div>
 
             {isEditingDescription ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <textarea
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
                   placeholder="Tell us about this member..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
                   rows={4}
                 />
-                <div className="flex space-x-2">
+                <div className="flex space-x-3">
                   <button
                     onClick={handleSaveDescription}
                     disabled={loading === 'save-description'}
-                    className="inline-flex items-center px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors duration-200 disabled:opacity-50"
+                    className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors duration-200 disabled:opacity-50"
                   >
                     {loading === 'save-description' ? (
-                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                     ) : (
-                      <Save className="h-3 w-3 mr-1" />
+                      <Save className="h-4 w-4 mr-2" />
                     )}
                     Save
                   </button>
                   <button
                     onClick={handleCancelDescription}
-                    className="inline-flex items-center px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 transition-colors duration-200"
+                    className="inline-flex items-center px-4 py-2 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors duration-200"
                   >
-                    <X className="h-3 w-3 mr-1" />
+                    <X className="h-4 w-4 mr-2" />
                     Cancel
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-gray-50 rounded-lg p-6">
                 {member.description ? (
-                  <p className="text-gray-700 text-sm leading-relaxed">{member.description}</p>
+                  <p className="text-gray-700 leading-relaxed">{member.description}</p>
                 ) : (
-                  <p className="text-gray-500 text-sm italic">
+                  <p className="text-gray-500 italic">
                     {canEdit ? 'No description added yet. Click edit to add one.' : 'No description available.'}
                   </p>
                 )}
@@ -444,35 +466,35 @@ const MemberDetailPage: React.FC = () => {
           </div>
 
           {/* Skills Section */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
+          <div className="mt-8 pt-6 border-t border-gray-200">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Skills</h3>
+              <h3 className="text-xl font-semibold text-gray-900">Skills</h3>
               {canEdit && !isEditingSkills && (
                 <button
                   onClick={() => setIsEditingSkills(true)}
-                  className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 transition-colors duration-200"
+                  className="inline-flex items-center px-3 py-2 bg-blue-100 text-blue-700 text-sm rounded-lg hover:bg-blue-200 transition-colors duration-200"
                 >
-                  <Edit className="h-3 w-3 mr-1" />
+                  <Edit className="h-4 w-4 mr-2" />
                   Edit
                 </button>
               )}
             </div>
 
             {isEditingSkills ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {/* Add new skill */}
-                <div className="flex space-x-2">
+                <div className="flex space-x-3">
                   <input
                     type="text"
                     value={newSkill}
                     onChange={(e) => setNewSkill(e.target.value)}
                     placeholder="Add a skill..."
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                     onKeyPress={(e) => e.key === 'Enter' && handleAddSkill()}
                   />
                   <button
                     onClick={handleAddSkill}
-                    className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
                   >
                     <Plus className="h-4 w-4" />
                   </button>
@@ -481,55 +503,55 @@ const MemberDetailPage: React.FC = () => {
                 {/* Skills list */}
                 <div className="space-y-2">
                   {editSkills.map((skill, index) => (
-                    <div key={index} className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
-                      <span className="text-sm text-gray-700">{skill}</span>
+                    <div key={index} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                      <span className="text-gray-700">{skill}</span>
                       <button
                         onClick={() => handleRemoveSkill(skill)}
                         className="text-red-500 hover:text-red-700 transition-colors duration-200"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   ))}
                 </div>
 
-                <div className="flex space-x-2">
+                <div className="flex space-x-3">
                   <button
                     onClick={handleSaveSkills}
                     disabled={loading === 'save-skills'}
-                    className="inline-flex items-center px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors duration-200 disabled:opacity-50"
+                    className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors duration-200 disabled:opacity-50"
                   >
                     {loading === 'save-skills' ? (
-                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                     ) : (
-                      <Save className="h-3 w-3 mr-1" />
+                      <Save className="h-4 w-4 mr-2" />
                     )}
                     Save
                   </button>
                   <button
                     onClick={handleCancelSkills}
-                    className="inline-flex items-center px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 transition-colors duration-200"
+                    className="inline-flex items-center px-4 py-2 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors duration-200"
                   >
-                    <X className="h-3 w-3 mr-1" />
+                    <X className="h-4 w-4 mr-2" />
                     Cancel
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-gray-50 rounded-lg p-6">
                 {member.skills && member.skills.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-3">
                     {member.skills.map((skill, index) => (
                       <span
                         key={index}
-                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
+                        className="inline-flex items-center px-3 py-2 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-200"
                       >
                         {skill}
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-sm italic">
+                  <p className="text-gray-500 italic">
                     {canEdit ? 'No skills added yet. Click edit to add some.' : 'No skills listed.'}
                   </p>
                 )}
@@ -539,24 +561,24 @@ const MemberDetailPage: React.FC = () => {
         </div>
 
         {/* View Mode Toggle */}
-        <div className="mb-6">
+        <div className="mb-8">
           <div className="flex items-center space-x-1 bg-white rounded-lg shadow-md border border-gray-200 p-1">
             <button
               onClick={() => setViewMode('recent')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
+              className={`px-6 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
                 viewMode === 'recent'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-600 hover:text-gray-800'
+                  ? 'bg-blue-500 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
               }`}
             >
               Recent Standups
             </button>
             <button
               onClick={() => setViewMode('calendar')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
+              className={`px-6 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
                 viewMode === 'calendar'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-600 hover:text-gray-800'
+                  ? 'bg-blue-500 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
               }`}
             >
               Calendar View
@@ -567,7 +589,7 @@ const MemberDetailPage: React.FC = () => {
         {/* Content */}
         {viewMode === 'recent' ? (
           <div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-6">
+            <h3 className="text-2xl font-semibold text-gray-900 mb-6">
               Recent Standups ({recentStandups.length})
             </h3>
             
@@ -578,14 +600,14 @@ const MemberDetailPage: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <div className="bg-white rounded-lg shadow-md border border-gray-200 p-12 text-center">
-                <div className="text-gray-400 mb-4">
-                  <AlertCircle className="h-12 w-12 mx-auto" />
+              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-12 text-center">
+                <div className="text-gray-400 mb-6">
+                  <AlertCircle className="h-16 w-16 mx-auto" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <h3 className="text-xl font-medium text-gray-900 mb-3">
                   No standups yet
                 </h3>
-                <p className="text-gray-500">
+                <p className="text-gray-500 text-lg">
                   This member hasn't submitted any standups yet.
                 </p>
               </div>

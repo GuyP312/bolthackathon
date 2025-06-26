@@ -186,6 +186,7 @@ const TeamPage: React.FC<TeamPageProps> = ({
                 }}
                 standupDates={getTeamStandupDates()}
                 leaveDates={getTeamLeaveDates()}
+                showStatusColors={false}
               />
             </div>
           )}

@@ -6,13 +6,15 @@ interface DatePickerProps {
   onDateChange: (date: Date) => void;
   standupDates?: string[];
   leaveDates?: string[];
+  showStatusColors?: boolean; // New prop to control status coloring
 }
 
 const DatePicker: React.FC<DatePickerProps> = ({ 
   selectedDate, 
   onDateChange, 
   standupDates = [], 
-  leaveDates = [] 
+  leaveDates = [],
+  showStatusColors = true // Default to true for backward compatibility
 }) => {
   const today = new Date();
   const currentMonth = selectedDate.getMonth();
@@ -89,6 +91,28 @@ const DatePicker: React.FC<DatePickerProps> = ({
   const getDayClasses = (day: number) => {
     const baseClasses = 'w-full h-full flex items-center justify-center text-sm font-medium transition-all duration-200 cursor-pointer';
     
+    // Simple mode - just basic styling without status colors
+    if (!showStatusColors) {
+      if (isSelected(day)) {
+        if (isToday(day)) {
+          return `${baseClasses} bg-blue-200 text-blue-800 rounded-xl border-2 border-blue-600 shadow-sm`;
+        }
+        return `${baseClasses} bg-blue-100 text-blue-800 rounded-xl border-2 border-blue-500 shadow-sm`;
+      }
+
+      if (isToday(day)) {
+        return `${baseClasses} bg-blue-100 text-blue-800 rounded-xl border border-blue-400 shadow-sm hover:shadow-md`;
+      }
+
+      if (isWeekday(day)) {
+        return `${baseClasses} bg-white text-gray-700 hover:bg-gray-50 rounded-xl border border-gray-300 shadow-sm hover:shadow-md`;
+      }
+
+      // Weekends
+      return `${baseClasses} bg-gray-200 text-gray-600 hover:bg-gray-300 rounded-lg border border-gray-400 shadow-sm hover:shadow-md`;
+    }
+
+    // Full status mode - original logic with colors
     if (isSelected(day)) {
       if (isToday(day)) {
         return `${baseClasses} bg-blue-200 text-blue-800 rounded-xl border-2 border-blue-600 shadow-sm`;
@@ -162,27 +186,29 @@ const DatePicker: React.FC<DatePickerProps> = ({
 
       {/* Calendar Content */}
       <div className="p-6">
-        {/* Legend */}
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-green-200 border border-green-400 rounded-md shadow-sm"></div>
-              <span className="text-gray-700 font-medium">Standup completed</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-yellow-200 border border-yellow-400 rounded-md shadow-sm"></div>
-              <span className="text-gray-700 font-medium">Leave day</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-red-200 border border-red-400 rounded-md shadow-sm"></div>
-              <span className="text-gray-700 font-medium">Missing standup</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-gray-200 border border-gray-400 rounded-md shadow-sm"></div>
-              <span className="text-gray-700 font-medium">Weekend/Future</span>
+        {/* Legend - only show when status colors are enabled */}
+        {showStatusColors && (
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-green-200 border border-green-400 rounded-md shadow-sm"></div>
+                <span className="text-gray-700 font-medium">Standup completed</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-yellow-200 border border-yellow-400 rounded-md shadow-sm"></div>
+                <span className="text-gray-700 font-medium">Leave day</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-red-200 border border-red-400 rounded-md shadow-sm"></div>
+                <span className="text-gray-700 font-medium">Missing standup</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-gray-200 border border-gray-400 rounded-md shadow-sm"></div>
+                <span className="text-gray-700 font-medium">Weekend/Future</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Day Headers */}
         <div className="grid grid-cols-7 gap-2 mb-3">
